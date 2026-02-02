@@ -16,6 +16,44 @@ The system demonstrates key security principles including:
 - Rate limiting (max 3 OTP attempts)
 - Cryptographically secure OTP generation
 
+### Database Architecture
+
+The system uses **SQLite** as a lightweight, file-based relational database to store user credentials and OTP records. This upgrade from in-memory storage provides:
+
+- **Persistent storage**: Data survives server restarts
+- **ACID compliance**: Atomic, consistent, isolated, and durable transactions
+- **Password hashing**: Passwords stored as hashes using werkzeug.security (scrypt/pbkdf2)
+- **Relational integrity**: Foreign key constraints between users and OTPs
+
+**Database Schema**:
+
+**`users` table**:
+- `id` - Primary key (auto-increment)
+- `username` - Unique username
+- `password_hash` - Hashed password using werkzeug
+- `telegram_chat_id` - User's Telegram chat ID for OTP delivery
+- `created_at` - Account creation timestamp
+
+**`otps` table**:
+- `id` - Primary key (auto-increment)
+- `user_id` - Foreign key to users table
+- `otp_code` - The 6-digit OTP code
+- `created_at` - OTP generation timestamp
+- `expires_at` - Expiration timestamp (created_at + 60 seconds)
+- `client_ip` - IP address from login request
+- `used` - Boolean flag (0 = unused, 1 = used)
+- `attempts` - Failed verification attempts counter
+
+The database is automatically created at `mfa.db` in the project root on first run. A demo user (`student/password123`) is seeded automatically with a hashed password.
+
+**How the Database Supports MFA Security**:
+
+1. **User Authentication**: Login queries the `users` table and verifies the password against the stored hash using constant-time comparison
+2. **OTP Lifecycle**: Each OTP is inserted into the `otps` table with expiration timestamp and IP binding
+3. **Security Checks**: All 5 security checks (existence, reuse, expiration, IP match, correctness) query the database
+4. **Attempt Limiting**: Failed attempts increment the `attempts` column; after 3 attempts, OTP is marked as used
+5. **Cleanup**: Used OTPs remain in database for audit purposes but are marked with `used = 1`
+
 ## Security Features
 
 ### 1. Multi-Factor Authentication (MFA)
@@ -55,34 +93,12 @@ Each OTP can only be used once. After successful verification, the OTP is marked
    pip install -r requirements.txt
    ```
 
-3. **Configure Telegram credentials**
-   
-   Create a `.env` file from the template:
-   
-   **Windows PowerShell:**
-   ```powershell
-   Copy-Item .env.example .env
-   notepad .env
-   ```
-   
-   **Linux/macOS:**
-   ```bash
-   cp .env.example .env
-   nano .env
-   ```
-   
-   Fill in your `TELEGRAM_TOKEN` and `TELEGRAM_CHAT_ID` values.
-   
-   **Alternative:** Set environment variables directly:
-   ```powershell
-   $env:TELEGRAM_TOKEN="your_token_here"
-   $env:TELEGRAM_CHAT_ID="your_chat_id_here"
-   ```
-
-4. **Run the Flask application**
+3. **Run the Flask application**
    ```bash
    python app.py
    ```
+   
+   > **Note**: The SQLite database (`mfa.db`) will be automatically created in the project root on first run, and a demo user will be seeded with hashed credentials.
 
 5. **Access the application**
    - Open your browser and navigate to `http://localhost:5000`
@@ -162,40 +178,33 @@ MFA_Project/
 5. **One-Time Use**: OTPs cannot be reused (prevents replay attacks)
 6. **Error Handling**: Graceful error handling prevents information leakage
 7. **Cryptographically Secure OTP**: Uses Python's `secrets` module instead of `random`
-8. **Environment Variables**: Sensitive credentials stored outside source code
-9. **Rate Limiting**: Max 3 OTP attempts per 60 seconds prevents brute force
-10. **Restricted CORS**: Origins limited to localhost for development security
+8. **Password Hashing**: Passwords stored as hashes using werkzeug.security
+9. **Rate Limiting**: Max 3 OTP attempts per login prevents brute force
+10. **Persistent Storage**: SQLite database with ACID compliance
+11. **Relational Integrity**: Foreign key constraints ensure data consistency
+12. **CORS Configuration**: Open to all origins for demo simplicity; in production this would be restricted
 
 ### Limitations and Considerations
 
-1. **In-Memory Storage**: OTPs stored in memory (lost on server restart)
-   - **Production Solution**: Use Redis or database for persistent storage
+1. **Single User**: Only one user configured for demo purposes
+   - **Production Solution**: Implement user registration and management system
 
-2. **Plain Text Passwords**: Passwords stored in plain text
-   - **Production Solution**: Use bcrypt or Argon2 for password hashing
-
-3. **Single User**: Only one user configured
-   - **Production Solution**: Implement user database with proper authentication
-
-4. **In-Memory Rate Limiting**: Rate limiting resets on server restart
-   - **Production Solution**: Use Redis or distributed cache for persistent rate limiting
-
-5. **Development Server**: Uses Flask development server
+2. **Development Server**: Uses Flask development server
    - **Production Solution**: Use Gunicorn or uWSGI with proper configuration
 
-6. **No HTTPS**: HTTP only (credentials transmitted in plain text)
+3. **No HTTPS**: HTTP only (credentials transmitted in plain text over network)
    - **Production Solution**: Deploy behind HTTPS/TLS reverse proxy
 
-7. **Telegram Dependency**: Requires Telegram API availability
+4. **Telegram Dependency**: Requires Telegram API availability
    - **Production Solution**: Implement fallback mechanisms (SMS, email)
 
-8. **IP Validation Limitations**: May fail behind proxies/NAT
+5. **IP Validation Limitations**: May fail behind proxies/NAT
    - **Production Solution**: Use session tokens or more sophisticated validation
 
-9. **No Audit Logging**: No logging of authentication attempts
-   - **Production Solution**: Implement comprehensive audit logging
+6. **No Audit Logging**: No comprehensive logging of authentication attempts
+   - **Production Solution**: Implement comprehensive audit logging with timestamps
 
-10. **Client-Side Storage**: Uses sessionStorage (can be cleared)
+7. **Client-Side Storage**: Uses sessionStorage (can be cleared)
     - **Production Solution**: Use secure HTTP-only cookies
 
 ## Raspberry Pi / MPU Readiness
@@ -269,9 +278,6 @@ This containerization approach demonstrates MPU-readiness and portability, makin
 
 ## Future Enhancements
 
-- Database integration for user and OTP storage
-- Password hashing (bcrypt/Argon2)
-- Rate limiting and brute force protection
 - HTTPS/TLS support
 - Multiple OTP delivery methods (SMS, email)
 - Session management with secure cookies

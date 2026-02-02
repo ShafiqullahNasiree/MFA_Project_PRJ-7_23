@@ -1,0 +1,12 @@
+{
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportUnusedImport": "none",
+        "reportUnusedVariable": "none",
+        "reportGeneralTypeIssues": "none",
+        "reportOptionalMemberAccess": "none",
+        "reportUnusedExpression": "none",
+        "reportMissingTypeStubs": "none",
+        "reportUnknownVariableType": "none",
+        "reportUntypedFunctionDecorator": "none"
+    }
+}

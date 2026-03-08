@@ -84,12 +84,12 @@ def init_db():
 
 
 def seed_demo_user():
-    """Create demo user (student/password123) if not exists."""
+    """Create demo user (student2/password123) if not exists."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
     # Check if demo user already exists
-    cursor.execute('SELECT id FROM users WHERE username = ?', ('student',))
+    cursor.execute('SELECT id FROM users WHERE username = ?', ('student2',))
     existing_user = cursor.fetchone()
     
     if not existing_user:
@@ -101,12 +101,12 @@ def seed_demo_user():
         cursor.execute('''
             INSERT INTO users (username, password_hash, telegram_chat_id, created_at)
             VALUES (?, ?, ?, ?)
-        ''', ('student', password_hash, TELEGRAM_CHAT_ID, created_at))
+        ''', ('student2', password_hash, TELEGRAM_CHAT_ID, created_at))
         
         conn.commit()
-        print("[+] Demo user 'student' created successfully")
+        print("[+] Demo user 'student2' created successfully")
     else:
-        print("[i] Demo user 'student' already exists")
+        print("[i] Demo user 'student2' already exists")
     
     conn.close()
 
@@ -193,6 +193,7 @@ def login():
         
         # OTP expires after 60 seconds
         created_at = datetime.utcnow()
+
         expires_at = created_at + timedelta(seconds=OTP_EXPIRATION_TIME)
         
         # Invalidate any existing OTPs for this user

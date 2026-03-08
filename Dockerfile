@@ -6,4 +6,3 @@ COPY backend/app.py .
 COPY frontend /frontend
 EXPOSE 5000
 CMD ["python", "app.py"]
-
